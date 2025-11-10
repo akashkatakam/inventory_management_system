@@ -98,7 +98,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     salt = Column(String(64), nullable=False) # Store the salt
     
-    role = Column(Enum("Owner", "Back Office"), nullable=False)
+    role = Column(Enum("Owner", "Back Office","PDI"), nullable=False)
 
     Branch_ID = Column(String(10), ForeignKey("branches.Branch_ID"), nullable=True)
     
