@@ -1,7 +1,7 @@
 # inventory_manager.py
 
 from typing import Any, Dict, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy import func, case, and_, or_
 import pandas as pd
 from datetime import date
@@ -78,6 +78,38 @@ def get_multi_branch_stock(db: Session, branch_ids: List[str]) -> pd.DataFrame:
         .filter(InventoryTransaction.Current_Branch_ID.in_(branch_ids))
         .group_by(Branch.Branch_Name, InventoryTransaction.Model, InventoryTransaction.Variant, InventoryTransaction.Color)
         .having(func.sum(net_quantity) != 0)
+    )
+    
+    return pd.read_sql(query.statement, db.get_bind())
+
+def get_daily_transfer_summary(db: Session, limit: int = 100) -> pd.DataFrame:
+    """
+    Returns a day-by-day summary of ALL vehicle transfers between branches.
+    Designed for Owner/PDI high-level review.
+    """
+    # Aliases for joining the Branch table twice (once for sender, once for receiver)
+    FromBranch = aliased(Branch)
+    ToBranch = aliased(Branch)
+
+    query = (
+        db.query(
+            InventoryTransaction.Date,
+            FromBranch.Branch_Name.label("From_Branch"),
+            ToBranch.Branch_Name.label("To_Branch"),
+            func.sum(InventoryTransaction.Quantity).label("Total_Qty"),
+            # Optional: Concatenate models to see what was moved (MySQL specific syntax might vary)
+            # func.group_concat(InventoryTransaction.Model).label("Models_Included") 
+        )
+        .join(FromBranch, InventoryTransaction.From_Branch_ID == FromBranch.Branch_ID)
+        .join(ToBranch, InventoryTransaction.To_Branch_ID == ToBranch.Branch_ID)
+        .filter(InventoryTransaction.Transaction_Type == TransactionType.OUTWARD_TRANSFER)
+        .group_by(
+            InventoryTransaction.Date,
+            FromBranch.Branch_Name,
+            ToBranch.Branch_Name
+        )
+        .order_by(InventoryTransaction.Date.desc())
+        .limit(limit)
     )
     
     return pd.read_sql(query.statement, db.get_bind())

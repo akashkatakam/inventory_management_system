@@ -1,5 +1,6 @@
 # inventory_models.py
 
+import hashlib
 from sqlalchemy import Column, Float, Integer, String, Date, DateTime, ForeignKey, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
@@ -22,6 +23,7 @@ class Branch(Base):
     __tablename__ = "branches"
     Branch_ID = Column(String(10), primary_key=True)
     Branch_Name = Column(String(100))
+    users = relationship("User", back_populates="branch")
     # No new columns added here!
 
 # --- NEW: SIDECAR HIERARCHY TABLE ---
@@ -84,3 +86,40 @@ class VehiclePrice(Base):
     # --- END FULL PRICING COLUMNS ---
     
     Color_List = Column(String(500)) 
+
+class User(Base):
+    """Stores user logins and roles for the dashboard."""
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), unique=True, index=True, nullable=False)
+    
+    # We will store the salt and the hash
+    hashed_password = Column(String(255), nullable=False)
+    salt = Column(String(64), nullable=False) # Store the salt
+    
+    role = Column(Enum("Owner", "Back Office"), nullable=False)
+
+    Branch_ID = Column(String(10), ForeignKey("branches.Branch_ID"), nullable=True)
+    
+    # --- NEW RELATIONSHIP ---
+    branch = relationship("Branch", back_populates="users")
+    
+    def verify_password(self, plain_password: str) -> bool:
+        """Checks if the plain password matches the hash."""
+        
+        # --- CRITICAL FIX ---
+        # 1. Convert the stored hex salt back into raw bytes
+        salt_bytes = bytes.fromhex(self.salt)
+        
+        # 2. Hash the provided password with the retrieved salt
+        check_hash_bytes = hashlib.pbkdf2_hmac(
+            'sha256',
+            plain_password.encode('utf-8'),
+            salt_bytes, # Use the raw bytes
+            100000
+        )
+        
+        # 3. Compare the new hash (in hex) with the stored hash (in hex)
+        return check_hash_bytes.hex() == self.hashed_password
+        # --- END FIX ---
