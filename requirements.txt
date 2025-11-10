@@ -1,0 +1,5 @@
+PyMySQL
+sqlalchemy
+streamlit
+reportlab
+pandas
