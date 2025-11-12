@@ -87,7 +87,7 @@ def render_stock_view_interactive(branch_map_for_view, vehicle_master, user_role
     db = next(get_db())
     try:
         as_of_date = date_range[1] if (date_range and len(date_range) == 2) else date.today()
-        raw_stock_df = mgr.get_multi_branch_stock(db, selected_ids, as_of_date)
+        raw_stock_df = mgr.get_multi_branch_stock(db, selected_ids)
         
         if raw_stock_df.empty:
              st.info(f"Zero stock recorded on {as_of_date.strftime('%d-%m-%Y')}.")
